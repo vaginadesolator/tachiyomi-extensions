@@ -26,6 +26,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @Nsfw
 class Doujins : HttpSource() {
@@ -82,7 +83,7 @@ class Doujins : HttpSource() {
     }
 
     private fun getLatestPageUrl(page: Int): String {
-        val endDate = Calendar.getInstance().apply {
+        val endDate = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
             add(Calendar.DATE, 1)
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
