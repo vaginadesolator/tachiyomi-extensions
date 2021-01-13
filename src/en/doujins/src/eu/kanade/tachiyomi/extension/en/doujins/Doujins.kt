@@ -50,7 +50,9 @@ class Doujins : HttpSource() {
                 name = "Chapter"
                 setUrlWithoutDomain(response.request().url().toString())
 
-                val date = response.asJsoup().select(".folder-message").last().text().substringBefore(" • ")
+                val dateAndPageCountString = response.asJsoup().select(".text-md-right.text-sm-left > .folder-message").text()
+
+                val date = dateAndPageCountString.substringBefore(" • ")
                 for (dateFormat in MANGA_DETAILS_DATE_FORMAT) {
                     if (date_upload == 0L)
                         date_upload = dateFormat.parseOrNull(date)?.time ?: 0L
