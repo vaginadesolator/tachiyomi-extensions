@@ -8,7 +8,7 @@ import java.util.Locale
 private const val EH_ARTIST_NAMESPACE = "artist"
 private const val EH_AUTHOR_NAMESPACE = "author"
 
-private val ONGOING_SUFFIX = arrayOf(
+val ONGOING_SUFFIX = arrayOf(
     "[ongoing]",
     "(ongoing)",
     "{ongoing}"
@@ -58,7 +58,6 @@ fun ExGalleryMetadata.copyTo(manga: SManga) {
         detailsDesc += "\n"
     }
     size?.let { detailsDesc += "File Size: ${humanReadableByteCount(it, true)}\n" }
-    length?.let { detailsDesc += "Length: $it pages\n" }
     favorites?.let { detailsDesc += "Favorited: $it times\n" }
     averageRating?.let {
         detailsDesc += "Rating: $it"
