@@ -103,8 +103,9 @@ class Doujins : HttpSource() {
         val document = response.asJsoup()
         return SManga.create().apply {
             title = document.select(".folder-title a").last().text()
-            artist = document.select(".gallery-artist a").joinToString(", ") { it.text() }
+            artist = document.select(".gallery-artist a").joinToString { it.text() }
             author = artist
+            genre = document.select(".tag-area").first().select("a").joinToString { it.text() }
         }
     }
 
