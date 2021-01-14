@@ -76,6 +76,7 @@ class Pururin : ParsedHttpSource() {
     private fun getDesc(document: Document): String {
         val infoElement = document.select("div.box.box-gallery")
         val uploader = infoElement.select("tr:has(td:contains(Uploader)) .user-link")?.text()
+        val pages = infoElement.select("tr:has(td:contains(Pages)) td:eq(1)").text()
         val ratingCount = infoElement.select("tr:has(td:contains(Ratings)) span[itemprop=\"ratingCount\"]")?.attr("content")
 
         val rating = infoElement.select("tr:has(td:contains(Ratings)) gallery-rating").attr(":rating")?.toFloatOrNull()?.let {
@@ -97,6 +98,7 @@ class Pururin : ParsedHttpSource() {
         val descriptions = listOf(
             multiDescriptions.joinToString("\n\n"),
             uploader?.let { "Uploader: $it" },
+            pages?.let { "Pages: $it" },
             rating?.let { "Ratings: $it" + (ratingCount?.let { c -> " ($c ratings)" } ?: "") }
         )
 
@@ -116,7 +118,6 @@ class Pururin : ParsedHttpSource() {
                     chapter_number = details[0].text().removePrefix("#").toFloat()
                     name = details[1].select("a").text()
                     setUrlWithoutDomain(details[1].select("a").attr("href"))
-                    page_count = details[2].text().toInt()
 
                     if (it.hasClass("active") && mangaInfoElements.containsKey("Scanlator"))
                         scanlator = mangaInfoElements.getValue("Scanlator").select("li a")?.joinToString { s -> s.text() }
@@ -127,7 +128,6 @@ class Pururin : ParsedHttpSource() {
                 SChapter.create().apply {
                     name = "Chapter"
                     setUrlWithoutDomain(response.request().url().toString())
-                    page_count = mangaInfoElements["Pages"]?.text()?.substringBefore(" ")?.toInt() ?: 0
 
                     if (mangaInfoElements.containsKey("Scanlator"))
                         scanlator = mangaInfoElements.getValue("Scanlator").select("li a")?.joinToString { s -> s.text() }
