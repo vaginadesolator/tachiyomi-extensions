@@ -138,9 +138,12 @@ abstract class SimplyHentai(
                 url = response.request().url().toString().removeSuffix("/").substringAfterLast("/")
                 chapter_number = 1f
 
-                date_upload = response.asJsoup().select(".stat-container div:contains(Uploaded) div.bold")?.text().let {
-                    DATE_FORMAT.parse(it!!)?.time
-                } ?: 0L
+                val document = response.asJsoup()
+                date_upload = document.select(".stat-container div:contains(Uploaded) div.bold")
+                    ?.text().let { DATE_FORMAT.parse(it!!)?.time } ?: 0L
+
+                page_count = document.select("a.btn-block.btn-danger:contains(All Pages)")
+                    ?.text()?.substringAfter("(")?.removeSuffix(")")?.toInt() ?: 0
             }
         )
     }
