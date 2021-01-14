@@ -194,7 +194,7 @@ class Hentai2Read : ParsedHttpSource() {
             "Character",
             "Language"
         ).map { it to infoElement.select("li:contains($it) a").map { v -> v.text() } }
-            .let { topDescriptions + it } // start with storyline
+            .let { topDescriptions + it } // start with topDescriptions
             .filter { !it.second.isNullOrEmpty() && it.second[0] != "-" }
             .map { "${it.first}:\n${it.second.joinToString()}" }
 
