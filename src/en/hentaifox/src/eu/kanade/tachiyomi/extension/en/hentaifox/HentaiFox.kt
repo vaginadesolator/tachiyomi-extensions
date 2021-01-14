@@ -109,13 +109,15 @@ class HentaiFox : ParsedHttpSource() {
     // Chapters
 
     override fun chapterListParse(response: Response): List<SChapter> {
+        val document = response.asJsoup()
         return listOf(
             SChapter.create().apply {
                 name = "Chapter"
                 // page path with a marker at the end
                 url = "${response.request().url().toString().replace("/gallery/", "/g/")}#"
                 // number of pages
-                url += response.asJsoup().select("[id=load_pages]").attr("value")
+                url += document.select("[id=load_pages]").attr("value")
+                page_count = document.select("span.pages:contains(Pages)")?.text()?.substringAfter(": ")?.toInt() ?: 0
             }
         )
     }
