@@ -119,6 +119,7 @@ abstract class SimplyHentai(
             manga.description += info.select("div.link-box > div.box-title:contains(Characters) ~ a").let { e ->
                 if (e.text().isNotEmpty()) ("Characters: ${e.joinToString { it.text() }}\n\n") else ""
             }
+            manga.status = SManga.COMPLETED
         }
         manga.thumbnail_url = document.select("div.col-xs-12 img.img-responsive").attr("abs:data-src")
 
