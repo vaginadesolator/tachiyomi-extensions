@@ -5,7 +5,7 @@ ext {
     extName = 'HentaiFox'
     pkgNameSuffix = 'en.hentaifox'
     extClass = '.HentaiFox'
-    extVersionCode = 2
+    extVersionCode = 3
     libVersion = '1.2'
     containsNsfw = true
 }
