@@ -30,6 +30,7 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.concurrent.CompletableFuture
 
+@Nsfw
 class HentaiHand : HttpSource() {
 
     override val baseUrl: String = "https://hentaihand.com"
