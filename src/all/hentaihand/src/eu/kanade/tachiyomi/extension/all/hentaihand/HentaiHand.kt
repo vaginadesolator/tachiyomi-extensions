@@ -160,7 +160,6 @@ class HentaiHand : HttpSource() {
                 Pair("Alternative Title", data["alternative_title"].nullString),
                 Pair("Groups", tagArrayToString(data.getAsJsonArray("groups"))),
                 Pair("Description", data["description"].nullString),
-                Pair("Pages", data["pages"].asInt.toString()),
                 Pair("Category", data["category"].nullObj?.get("name")?.asString),
                 Pair("Language", data["language"].nullObj?.get("name")?.asString),
                 Pair("Parodies", tagArrayToString(data.getAsJsonArray("parodies"))),
@@ -181,6 +180,7 @@ class HentaiHand : HttpSource() {
                 name = "Chapter"
                 date_upload = DATE_FORMAT.parse(data["uploaded_at"].asString)?.time ?: 0
                 chapter_number = 1f
+                page_count = data["pages"].asInt
             }
         )
     }
