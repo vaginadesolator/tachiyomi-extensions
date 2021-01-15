@@ -2,10 +2,10 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 ext {
-    extName = 'Novelle Leggere'
-    pkgNameSuffix = 'it.novelleleggere'
-    extClass = '.NovelleLeggere'
-    extVersionCode = 3
+    extName = 'HentaiHand'
+    pkgNameSuffix = 'all.hentaihand'
+    extClass = '.HentaiHand'
+    extVersionCode = 1
     libVersion = '1.2'
 }
 
