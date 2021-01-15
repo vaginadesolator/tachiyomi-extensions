@@ -10,6 +10,7 @@ import com.github.salomonbrys.kotson.nullString
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import eu.kanade.tachiyomi.annotations.Nsfw
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.source.model.Filter
@@ -30,6 +31,7 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.concurrent.CompletableFuture
 
+@Nsfw
 class HentaiHand : HttpSource() {
 
     override val baseUrl: String = "https://hentaihand.com"
