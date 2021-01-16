@@ -9,3 +9,6 @@ build/
 repo/
 apk/
 gen
+keystore.jks
+
+keystore.base64.txt
