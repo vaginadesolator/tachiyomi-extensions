@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 include(":annotations")
 include(":core")
 
@@ -10,12 +12,24 @@ project(":duktape-stub").projectDir = File("lib/duktape-stub")
 include(":lib-dataimage")
 project(":lib-dataimage").projectDir = File("lib/dataimage")
 
-// Loads all extensions
-File(rootDir, "src").eachDir { dir ->
-    dir.eachDir { subdir ->
-        val name = ":${dir.name}-${subdir.name}"
+
+val isNsfwPattern: Pattern = Pattern.compile(
+        "\\n+\\s*\\/{0}s*containsNsfw\\s*=\\s*true",
+        java.util.regex.Pattern.UNICODE_CHARACTER_CLASS
+)
+
+fun shouldInclude(langDir: File, extDir: File): Boolean {
+    return langDir.name in arrayOf("all", "en") // only these languages
+            && extDir.listFiles()?.firstOrNull { it.name == "build.gradle" }
+                ?.readText()?.matches(isNsfwPattern) == true // only if NSFW
+}
+
+// Loads extensions
+File(rootDir, "src").listDirectories { langDir ->
+    langDir.listDirectories()?.filter { shouldInclude(langDir, it) }?.forEach { extDir ->
+        val name = ":${langDir.name}-${extDir.name}"
         include(name)
-        project(name).projectDir = File("src/${dir.name}/${subdir.name}")
+        project(name).projectDir = File("src/${langDir.name}/${extDir.name}")
     }
 }
 
@@ -25,6 +39,14 @@ File(rootDir, "src").eachDir { dir ->
 // include(":${lang}-${name}")
 // project(":${lang}-${name}").projectDir = File("src/${lang}/${name}")
 
-inline fun File.eachDir(block: (File) -> Unit) {
+fun String.matches(pattern: java.util.regex.Pattern): Boolean {
+    return pattern.matcher(this).find()
+}
+
+fun File.listDirectories(): List<File>? {
+    return listFiles()?.filter { it.isDirectory }
+}
+
+inline fun File.listDirectories(block: (File) -> Unit) {
     listFiles()?.filter { it.isDirectory }?.forEach { block(it) }
 }
