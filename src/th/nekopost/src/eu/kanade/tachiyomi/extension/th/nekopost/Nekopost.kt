@@ -53,6 +53,8 @@ class Nekopost : ParsedHttpSource() {
 
             override var scanlator: String? = null
 
+            override var page_count: Int = 0
+
             lateinit var chapterData: ProjectParser.ProjectData.ChapterInfo
             lateinit var projectData: ProjectParser.ProjectData
         }
