@@ -8,6 +8,7 @@
 
         <meta-data android:name="tachiyomi.extension.class" android:value="${extClass}" />
         <meta-data android:name="tachiyomi.extension.nsfw" android:value="${nsfw}" />
+        <meta-data android:name="tachiyomi.extension.vendor" android:value="${vendor}" />
 
     </application>
 

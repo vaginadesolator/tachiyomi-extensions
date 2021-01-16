@@ -30,11 +30,12 @@ android {
         applicationIdSuffix pkgNameSuffix
         versionCode extVersionCode
         versionName "$libVersion.$extVersionCode"
-        setProperty("archivesBaseName", "tachiyomi-$pkgNameSuffix-v$versionName")
+        setProperty("archivesBaseName", "vaginadesolator-$pkgNameSuffix-v$versionName")
         manifestPlaceholders = [
                 appName : "Tachiyomi: $extName",
                 extClass: extClass,
                 nsfw: project.ext.properties.getOrDefault("containsNsfw", false) ? 1 : 0,
+                vendor: "vaginadesolator"
         ]
     }
 
