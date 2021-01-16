@@ -2,10 +2,10 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 ext {
-    extName = 'Tsumino'
-    pkgNameSuffix = 'en.tsumino'
-    extClass = '.Tsumino'
-    extVersionCode = 4
+    extName = 'IMHentai'
+    pkgNameSuffix = 'all.imhentai'
+    extClass = '.IMHentai'
+    extVersionCode = 2
     libVersion = '1.2'
     containsNsfw = true
 }

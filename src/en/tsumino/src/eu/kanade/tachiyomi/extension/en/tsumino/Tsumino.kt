@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.extension.en.tsumino.TsuminoUtils.Companion.getArtist
 import eu.kanade.tachiyomi.extension.en.tsumino.TsuminoUtils.Companion.getChapter
 import eu.kanade.tachiyomi.extension.en.tsumino.TsuminoUtils.Companion.getCollection
 import eu.kanade.tachiyomi.extension.en.tsumino.TsuminoUtils.Companion.getDesc
+import eu.kanade.tachiyomi.extension.en.tsumino.TsuminoUtils.Companion.getTags
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.asObservableSuccess
@@ -155,6 +156,7 @@ class Tsumino : ParsedHttpSource() {
         manga.status = SManga.COMPLETED
         manga.thumbnail_url = infoElement.select("img").attr("src")
         manga.description = getDesc(document)
+        manga.genre = getTags(document).joinToString()
 
         return manga
     }
