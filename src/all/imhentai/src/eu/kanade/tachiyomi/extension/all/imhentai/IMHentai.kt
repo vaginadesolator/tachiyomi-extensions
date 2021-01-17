@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.all.imhentai
 
-import eu.kanade.tachiyomi.annotations.Nsfw
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.asObservableSuccess
@@ -23,10 +22,7 @@ import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 import rx.Observable
 
-@Nsfw
-class IMHentai : ParsedHttpSource() {
-
-    private val pageLoadUrl: String = "https://imhentai.com/inc/thumbs_loader.php"
+class IMHentai(override val lang: String, private val imhLang: String) : ParsedHttpSource() {
 
     private val pageLoadHeaders: Headers = Headers.Builder().apply {
         add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
@@ -34,7 +30,6 @@ class IMHentai : ParsedHttpSource() {
     }.build()
 
     override val baseUrl: String = "https://imhentai.com"
-    override val lang = "en"
     override val name: String = "IMHentai"
     override val supportsLatest = true
 
@@ -56,7 +51,7 @@ class IMHentai : ParsedHttpSource() {
 
     override fun popularMangaSelector(): String = ".thumbs_container .thumb"
 
-    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/popular?page=$page")
+    override fun popularMangaRequest(page: Int): Request = searchMangaRequest(page, "", getFilterList(SORT_ORDER_POPULAR))
 
     // Latest
 
@@ -64,7 +59,7 @@ class IMHentai : ParsedHttpSource() {
 
     override fun latestUpdatesNextPageSelector(): String = popularMangaNextPageSelector()
 
-    override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/search/?lt=1&page=$page")
+    override fun latestUpdatesRequest(page: Int): Request = searchMangaRequest(page, "", getFilterList(SORT_ORDER_LATEST))
 
     override fun latestUpdatesSelector(): String = popularMangaSelector()
 
@@ -80,6 +75,7 @@ class IMHentai : ParsedHttpSource() {
         val url = HttpUrl.parse("$baseUrl/search")!!.newBuilder()
             .addQueryParameter("key", query)
             .addQueryParameter("page", page.toString())
+            .addQueryParameter(getLanguageURIByName(imhLang).uri, toBinary(true)) // main language always enabled
 
         (if (filters.isEmpty()) getFilterList() else filters).forEach { filter ->
             when (filter) {
@@ -98,6 +94,7 @@ class IMHentai : ParsedHttpSource() {
                         url.addQueryParameter(pair.second, toBinary(filter.state == index))
                     }
                 }
+                else -> { }
             }
         }
 
@@ -190,7 +187,7 @@ class IMHentai : ParsedHttpSource() {
             .asObservableSuccess()
             .map { pageLoadMetaParse(it.asJsoup()) }
             .map { RequestBody.create(MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8"), it) }
-            .concatMap { client.newCall(POST(pageLoadUrl, pageLoadHeaders, it)).asObservableSuccess() }
+            .concatMap { client.newCall(POST(PAEG_LOAD_URL, pageLoadHeaders, it)).asObservableSuccess() }
             .map { pageListParse(it) }
     }
 
@@ -204,15 +201,19 @@ class IMHentai : ParsedHttpSource() {
 
     // Filters
 
-    private class SortOrderFilter(sortOrderURIs: List<Pair<String, String>>) : Filter.Select<String>("Sort By", sortOrderURIs.map { it.first }.toTypedArray())
-    private class SearchFlagFilter(name: String, val uri: String = name) : Filter.CheckBox(name, true)
-    private class LanguageFilters(flags: List<SearchFlagFilter>) : Filter.Group<SearchFlagFilter>("Language", flags)
-    private class CategoryFilters(flags: List<SearchFlagFilter>) : Filter.Group<SearchFlagFilter>("Category", flags)
+    private class SortOrderFilter(sortOrderURIs: List<Pair<String, String>>, state: Int) :
+        Filter.Select<String>("Sort By", sortOrderURIs.map { it.first }.toTypedArray(), state)
+    private open class SearchFlagFilter(name: String, val uri: String, state: Boolean = true) : Filter.CheckBox(name, state)
+    private class LanguageFilter(name: String, uri: String = name) : SearchFlagFilter(name, uri, false)
+    private class LanguageFilters(flags: List<LanguageFilter>) : Filter.Group<LanguageFilter>("Other Languages", flags)
+    private class CategoryFilters(flags: List<SearchFlagFilter>) : Filter.Group<SearchFlagFilter>("Categories", flags)
 
-    override fun getFilterList() = FilterList(
-        SortOrderFilter(getSortOrderURIs()),
+    override fun getFilterList() = getFilterList(SORT_ORDER_DEFAULT)
+
+    private fun getFilterList(sortOrderState: Int) = FilterList(
+        SortOrderFilter(getSortOrderURIs(), sortOrderState),
         CategoryFilters(getCategoryURIs()),
-        LanguageFilters(getLanguageURIs())
+        LanguageFilters(getLanguageURIs().filter { it.name != imhLang }) // exclude main lang
     )
 
     private fun getCategoryURIs() = listOf(
@@ -224,20 +225,44 @@ class IMHentai : ParsedHttpSource() {
         SearchFlagFilter("Game CG", "gamecg")
     )
 
+    // update sort order indices in companion object if order is changed
     private fun getSortOrderURIs() = listOf(
-        Pair("Latest", "lt"),
         Pair("Popular", "pp"),
+        Pair("Latest", "lt"),
         Pair("Downloads", "dl"),
         Pair("Top Rated", "tr")
     )
 
     private fun getLanguageURIs() = listOf(
-        SearchFlagFilter("English", "en"),
-        SearchFlagFilter("Japanese", "jp"),
-        SearchFlagFilter("Spanish", "es"),
-        SearchFlagFilter("French", "fr"),
-        SearchFlagFilter("Korean", "kr"),
-        SearchFlagFilter("German", "de"),
-        SearchFlagFilter("Russian", "ru")
+        LanguageFilter(LANGUAGE_ENGLISH, "en"),
+        LanguageFilter(LANGUAGE_JAPANESE, "jp"),
+        LanguageFilter(LANGUAGE_SPANISH, "es"),
+        LanguageFilter(LANGUAGE_FRENCH, "fr"),
+        LanguageFilter(LANGUAGE_KOREAN, "kr"),
+        LanguageFilter(LANGUAGE_GERMAN, "de"),
+        LanguageFilter(LANGUAGE_RUSSIAN, "ru")
     )
+
+    private fun getLanguageURIByName(name: String): LanguageFilter {
+        return getLanguageURIs().first { it.name == name }
+    }
+
+    companion object {
+
+        // references to sort order indices
+        private const val SORT_ORDER_POPULAR = 0
+        private const val SORT_ORDER_LATEST = 1
+        private const val SORT_ORDER_DEFAULT = SORT_ORDER_POPULAR
+
+        // references to be used in factory
+        const val LANGUAGE_ENGLISH = "English"
+        const val LANGUAGE_JAPANESE = "Japanese"
+        const val LANGUAGE_SPANISH = "Spanish"
+        const val LANGUAGE_FRENCH = "French"
+        const val LANGUAGE_KOREAN = "Korean"
+        const val LANGUAGE_GERMAN = "German"
+        const val LANGUAGE_RUSSIAN = "Russian"
+
+        private const val PAEG_LOAD_URL: String = "https://imhentai.com/inc/thumbs_loader.php"
+    }
 }
