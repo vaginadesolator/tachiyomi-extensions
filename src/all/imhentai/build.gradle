@@ -4,7 +4,7 @@ apply plugin: 'kotlin-android'
 ext {
     extName = 'IMHentai'
     pkgNameSuffix = 'all.imhentai'
-    extClass = '.IMHentai'
+    extClass = '.IMHentaiFactory'
     extVersionCode = 1
     libVersion = '1.2'
     containsNsfw = true
