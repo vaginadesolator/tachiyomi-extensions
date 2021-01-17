@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.all.hitomi
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.SharedPreferences
 import android.support.v7.preference.CheckBoxPreference
@@ -16,16 +17,18 @@ import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import rx.Observable
 import rx.Single
 import rx.schedulers.Schedulers
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.text.SimpleDateFormat
 import androidx.preference.CheckBoxPreference as AndroidXCheckBoxPreference
 import androidx.preference.PreferenceScreen as AndroidXPreferenceScreen
 
@@ -34,7 +37,7 @@ import androidx.preference.PreferenceScreen as AndroidXPreferenceScreen
  * Original work by NerdNumber9 for TachiyomiEH
  */
 
-open class Hitomi(override val lang: String, private val nozomiLang: String) : HttpSource(), ConfigurableSource {
+open class Hitomi(override val lang: String, private val nozomiLang: String) : ParsedHttpSource(), ConfigurableSource {
 
     override val supportsLatest = true
 
@@ -105,6 +108,9 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
     }
 
     override fun popularMangaParse(response: Response) = throw UnsupportedOperationException("Not used")
+    override fun popularMangaFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+    override fun popularMangaSelector(): String = throw UnsupportedOperationException("Not used")
+    override fun popularMangaNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
 
     // Latest
 
@@ -120,7 +126,10 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
         99L + 100 * (page - 1)
     )
 
+    override fun latestUpdatesSelector(): String = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesParse(response: Response) = throw UnsupportedOperationException("Not used")
+    override fun latestUpdatesFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+    override fun latestUpdatesNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
 
     // Search
 
@@ -207,11 +216,13 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList) = throw UnsupportedOperationException("Not used")
     override fun searchMangaParse(response: Response) = throw UnsupportedOperationException("Not used")
+    override fun searchMangaFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+    override fun searchMangaNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
+    override fun searchMangaSelector(): String = throw UnsupportedOperationException("Not used")
 
     // Details
 
-    override fun mangaDetailsParse(response: Response): SManga {
-        val document = response.asJsoup()
+    override fun mangaDetailsParse(document: Document): SManga {
         fun String.replaceSpaces() = this.replace(" ", "_")
 
         return SManga.create().apply {
@@ -240,28 +251,30 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
                     }
                     Pair(key, value)
                 }
-                .plus(Pair("Date uploaded", document.select("div.gallery span.date").text()))
                 .toMap()
             description = tableInfo.filterNot { it.value.isNullOrEmpty() || it.key in listOf("Series", "Characters", "Tags") }.entries.joinToString("\n") { "${it.key}: ${it.value}" }
             genre = listOfNotNull(tableInfo["Series"], tableInfo["Characters"], tableInfo["Tags"]).joinToString()
+            status = SManga.COMPLETED
         }
     }
 
     // Chapters
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
-        return Observable.just(
-            listOf(
-                SChapter.create().apply {
-                    url = manga.url
-                    name = "Chapter"
-                    chapter_number = 0.0f
-                }
-            )
-        )
-    }
+    override fun chapterListParse(response: Response): List<SChapter> = listOf(
+        SChapter.create().apply {
+            val document = response.asJsoup()
+            setUrlWithoutDomain(response.request().url().toString())
+            name = "Chapter"
+            chapter_number = 1f
 
-    override fun chapterListParse(response: Response) = throw UnsupportedOperationException("Not used")
+            date_upload = document.select(".gallery-info .date")?.text().let {
+                DATE_FORMAT.parse(it!!)?.time
+            } ?: 0
+        }
+    )
+
+    override fun chapterFromElement(element: Element): SChapter = throw UnsupportedOperationException("Not used")
+    override fun chapterListSelector(): String = throw UnsupportedOperationException("Not used")
 
     // Pages
 
@@ -307,7 +320,8 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
             .build()
     }
 
-    override fun imageUrlParse(response: Response) = throw UnsupportedOperationException("Not used")
+    override fun imageUrlParse(document: Document): String = throw UnsupportedOperationException("Not used")
+    override fun pageListParse(document: Document): List<Page> = throw UnsupportedOperationException("Not used")
 
     companion object {
         private const val INDEX_VERSION_CACHE_TIME_MS = 1000 * 60 * 10
@@ -329,6 +343,9 @@ open class Hitomi(override val lang: String, private val nozomiLang: String) : H
         private const val COVER_PREF_TITLE = "Use HQ covers"
         private const val COVER_PREF_SUMMARY = "See HQ covers while browsing"
         private const val COVER_PREF_DEFAULT_VALUE = true
+
+        @SuppressLint("SimpleDateFormat")
+        private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-DD hh:mm:ssX")
     }
 
     // Preferences

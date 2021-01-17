@@ -20,13 +20,14 @@ import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.CacheControl
 import okhttp3.CookieJar
 import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.Response
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
 import uy.kohesive.injekt.Injekt
@@ -35,7 +36,7 @@ import java.net.URLEncoder
 import android.support.v7.preference.CheckBoxPreference as LegacyCheckBoxPreference
 import android.support.v7.preference.PreferenceScreen as LegacyPreferenceScreen
 
-open class EHentai(override val lang: String, private val ehLang: String) : ConfigurableSource, HttpSource() {
+open class EHentai(override val lang: String, private val ehLang: String) : ConfigurableSource, ParsedHttpSource() {
 
     private val preferences: SharedPreferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
@@ -85,15 +86,23 @@ open class EHentai(override val lang: String, private val ehLang: String) : Conf
         return MangasPage(parsedMangas, hasNextPage)
     }
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = Observable.just(
-        listOf(
+    override fun chapterListParse(response: Response): List<SChapter> {
+        val document = response.asJsoup()
+        return listOf(
             SChapter.create().apply {
-                url = manga.url
+                setUrlWithoutDomain(document.location())
                 name = "Chapter"
                 chapter_number = 1f
+
+                val details = document.select("#gdd tr").map {
+                    it.select(".gdt1").text().removeSuffix(":") to it.select(".gdt2").text()
+                }.toMap()
+
+                page_count = details["Length"]?.substringBefore(" ")?.toInt() ?: 0
+                date_upload = details["Posted"]?.let { EX_DATE_FORMAT.parse(it)?.time } ?: 0
             }
         )
-    )
+    }
 
     override fun fetchPageList(chapter: SChapter) = fetchChapterPage(chapter, "$baseUrl/${chapter.url}").map {
         it.mapIndexed { i, s ->
@@ -194,86 +203,34 @@ open class EHentai(override val lang: String, private val ehLang: String) : Conf
      * Parse gallery page to metadata model
      */
     @SuppressLint("DefaultLocale")
-    override fun mangaDetailsParse(response: Response) = with(response.asJsoup()) {
-        with(ExGalleryMetadata()) {
-            url = response.request().url().encodedPath()
-            title = select("#gn").text().nullIfBlank()?.trim()
+    override fun mangaDetailsParse(document: Document) = SManga.create().apply {
 
-            altTitle = select("#gj").text().nullIfBlank()?.trim()
+        val titleText = document.select("#gn").text().nullIfBlank() ?: document.select("#gj").text()
+        title = titleText.trim()
 
-            // Thumbnail is set as background of element in style attribute
-            thumbnailUrl = select("#gd1 div").attr("style").nullIfBlank()?.let {
-                it.substring(it.indexOf('(') + 1 until it.lastIndexOf(')'))
-            }
-            genre = select("#gdc div").text().nullIfBlank()?.trim()?.toLowerCase()
+        thumbnail_url = document.select("#gd1 div").attr("style").nullIfBlank()?.substringAfterLast("url(")?.substringBefore(")")
 
-            uploader = select("#gdn").text().nullIfBlank()?.trim()
+        status = title.let { title ->
+            if (ONGOING_SUFFIX.any { title.endsWith(it, true) })
+                SManga.ONGOING
+            SManga.COMPLETED
+        }
 
-            // Parse the table
-            select("#gdd tr").forEach {
-                it.select(".gdt1")
-                    .text()
-                    .nullIfBlank()
-                    ?.trim()
-                    ?.let { left ->
-                        it.select(".gdt2")
-                            .text()
-                            .nullIfBlank()
-                            ?.trim()
-                            ?.let { right ->
-                                ignore {
-                                    when (
-                                        left.removeSuffix(":")
-                                            .toLowerCase()
-                                    ) {
-                                        "posted" -> datePosted = EX_DATE_FORMAT.parse(right)?.time ?: 0
-                                        "visible" -> visible = right.nullIfBlank()
-                                        "language" -> {
-                                            language = right.removeSuffix(TR_SUFFIX).trim().nullIfBlank()
-                                            translated = right.endsWith(TR_SUFFIX, true)
-                                        }
-                                        "file size" -> size = parseHumanReadableByteCount(right)?.toLong()
-                                        "length" -> length = right.removeSuffix("pages").trim().nullIfBlank()?.toInt()
-                                        "favorited" -> favorites = right.removeSuffix("times").trim().nullIfBlank()?.toInt()
-                                    }
-                                }
-                            }
-                    }
-            }
+        val tags = document.select("#taglist tr").map {
+            it.select(".tc").text().removeSuffix(":") to it.select("a").map { tag -> tag.text() }
+        }.toMap()
 
-            // Parse ratings
-            ignore {
-                averageRating = select("#rating_label")
-                    .text()
-                    .removePrefix("Average:")
-                    .trim()
-                    .nullIfBlank()
-                    ?.toDouble()
-                ratingCount = select("#rating_count")
-                    .text()
-                    .trim()
-                    .nullIfBlank()
-                    ?.toInt()
-            }
-
-            // Parse tags
-            tags.clear()
-            select("#taglist tr").forEach {
-                val namespace = it.select(".tc").text().removeSuffix(":")
-                val currentTags = it.select("div").map { element ->
-                    Tag(
-                        element.text().trim(),
-                        element.hasClass("gtl")
-                    )
-                }
-                tags[namespace] = currentTags
-            }
-
-            // Copy metadata to manga
-            SManga.create().apply {
-                copyTo(this)
+        tags["artist"]?.let {
+            if (!it.isNullOrEmpty()) {
+                artist = it.joinToString()
             }
         }
+
+        artist = tags["artist"]?.joinToString().nullIfBlank()
+
+        author = tags["author"]?.joinToString().nullIfBlank() ?: artist
+
+        genre = tags.values.flatten().distinct().joinToString(", ")
     }
 
     private fun searchMangaByIdRequest(id: String) = GET("$baseUrl/g/$id", headers)
@@ -295,11 +252,31 @@ open class EHentai(override val lang: String, private val ehLang: String) : Conf
         }
     }
 
-    override fun chapterListParse(response: Response) = throw UnsupportedOperationException("Unused method was called somehow!")
+    override fun chapterFromElement(element: Element) = throw UnsupportedOperationException("Not used")
 
-    override fun pageListParse(response: Response) = throw UnsupportedOperationException("Unused method was called somehow!")
+    override fun chapterListSelector() = throw UnsupportedOperationException("Not used")
 
-    override fun imageUrlParse(response: Response): String = response.asJsoup().select("#img").attr("abs:src")
+    override fun pageListParse(document: Document) = throw UnsupportedOperationException("Not used")
+
+    override fun popularMangaSelector(): String = throw UnsupportedOperationException("Not used")
+
+    override fun searchMangaFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+
+    override fun searchMangaNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
+
+    override fun popularMangaFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+
+    override fun popularMangaNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
+
+    override fun imageUrlParse(document: Document): String = document.select("#img").attr("abs:src")
+
+    override fun latestUpdatesFromElement(element: Element): SManga = throw UnsupportedOperationException("Not used")
+
+    override fun latestUpdatesNextPageSelector(): String? = throw UnsupportedOperationException("Not used")
+
+    override fun latestUpdatesSelector(): String = throw UnsupportedOperationException("Not used")
+
+    override fun searchMangaSelector(): String = throw UnsupportedOperationException("Not used")
 
     private val cookiesHeader by lazy {
         val cookies = mutableMapOf<String, String>()

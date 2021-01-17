@@ -5,9 +5,10 @@ ext {
     extName = 'NHentai'
     pkgNameSuffix = 'all.nhentai'
     extClass = '.NHFactory'
-    extVersionCode = 28
+    extVersionCode = 29
     libVersion = '1.2'
     containsNsfw = true
+    include = true
 }
 
 dependencies {

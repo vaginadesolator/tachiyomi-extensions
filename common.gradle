@@ -30,11 +30,12 @@ android {
         applicationIdSuffix pkgNameSuffix
         versionCode extVersionCode
         versionName "$libVersion.$extVersionCode"
-        setProperty("archivesBaseName", "tachiyomi-$pkgNameSuffix-v$versionName")
+        setProperty("archivesBaseName", "vaginadesolator-$pkgNameSuffix-v$versionName")
         manifestPlaceholders = [
                 appName : "Tachiyomi: $extName",
                 extClass: extClass,
                 nsfw: project.ext.properties.getOrDefault("containsNsfw", false) ? 1 : 0,
+                vendor: "vaginadesolator"
         ]
     }
 
@@ -61,7 +62,7 @@ dependencies {
     implementation project(":core")
 
     // Lib 1.2, but using specific commit so we don't need to bump up the version
-    compileOnly "com.github.tachiyomiorg:extensions-lib:a596412"
+    compileOnly "com.github.clarencecastillo:extensions-lib:045c1d2886"
 
     // These are provided by the app itself
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"

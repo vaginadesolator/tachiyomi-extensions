@@ -70,6 +70,7 @@ class MadaraFactory : SourceFactory {
         FurioScans(),
         GeceninLordu(),
         GoldenManga(),
+        GrazeScans(),
         GuncelManga(),
         HeroManhua(),
         HerozScanlation(),
@@ -133,6 +134,7 @@ class MadaraFactory : SourceFactory {
         MangaTeca(),
         MangaTurf(),
         MangaTX(),
+        MangaWeebs(),
         MangaWT(),
         MangaYaku(),
         MangaYosh(),
@@ -161,6 +163,7 @@ class MadaraFactory : SourceFactory {
         Milftoon(),
         MiracleScans(),
         MixedManga(),
+        MMScans(),
         MysticalMerries(),
         NazarickScans(),
         NeatManga(),
@@ -187,7 +190,9 @@ class MadaraFactory : SourceFactory {
         RenaScans(),
         RuyaManga(),
         S2Manga(),
+        SekteDoujin(),
         ShoujoHearts(),
+        Siyahmelek(),
         Skymanga(),
         SoloScanlation(),
         SpookyScanlations(),
@@ -205,6 +210,7 @@ class MadaraFactory : SourceFactory {
         TsubakiNoScan(),
         TurkceManga(),
         TwilightScans(),
+        UyuyanBalik(),
         Voidscans(),
         Wakascan(),
         WarQueenScan(),
@@ -448,7 +454,7 @@ class FirstKissManga : Madara(
     "1st Kiss",
     "https://1stkissmanga.com",
     "en",
-    dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.US)
+    SimpleDateFormat("MMM d, yyyy", Locale.US)
 ) {
     override fun headersBuilder(): Headers.Builder = super.headersBuilder().add("Referer", baseUrl)
 }
@@ -1501,3 +1507,17 @@ class Voidscans : Madara("Void Scans", "https://voidscans.com", "en") {
 class GeceninLordu : Madara("Gecenin Lordu", "https://geceninlordu.com/", "tr", SimpleDateFormat("dd MMM yyyy", Locale("tr"))) {
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList) = GET("$baseUrl/?s=$query&post_type=wp-manga")
 }
+
+class GrazeScans : Madara("Graze Scans", "https://grazescans.com/", "en")
+
+class UyuyanBalik : Madara("Uyuyan Balik", "https://uyuyanbalik.com/", "tr", SimpleDateFormat("dd MMMM yyyy", Locale.US))
+
+class MangaWeebs : Madara("Manga Weebs", "https://mangaweebs.in", "en")
+
+class MMScans : Madara("MMScans", "https://mm-scans.com/", "en")
+
+@Nsfw
+class Siyahmelek : Madara("Siyahmelek", "https://siyahmelek.com", "tr", SimpleDateFormat("dd MMM yyyy", Locale("tr")))
+
+@Nsfw
+class SekteDoujin : Madara("Sekte Doujin", "https://sektedoujin.xyz", "id")

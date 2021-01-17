@@ -1,0 +1,18 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+ext {
+    extName = 'HentaiNexus'
+    pkgNameSuffix = 'en.hentainexus'
+    extClass = '.HentaiNexus'
+    extVersionCode = 7
+    libVersion = '1.2'
+    containsNsfw = true
+    include = true
+}
+
+dependencies {
+    implementation project(':lib-ratelimit')
+}
+
+apply from: "$rootDir/common.gradle"
