@@ -13,15 +13,15 @@ include(":lib-dataimage")
 project(":lib-dataimage").projectDir = File("lib/dataimage")
 
 
-val isNsfwPattern: Pattern = Pattern.compile(
-        "\\n+\\s*\\/{0}s*containsNsfw\\s*=\\s*true",
+val includePattern: Pattern = Pattern.compile(
+        "\\n+\\s*\\/{0}s*include\\s*=\\s*true",
         java.util.regex.Pattern.UNICODE_CHARACTER_CLASS
 )
 
 fun shouldInclude(langDir: File, extDir: File): Boolean {
     return langDir.name in arrayOf("all", "en") // only these languages
             && extDir.listFiles()?.firstOrNull { it.name == "build.gradle" }
-                ?.readText()?.matches(isNsfwPattern) == true // only if NSFW
+                ?.readText()?.matches(includePattern) == true // only if ext "include" is present and set as true
 }
 
 // Loads extensions

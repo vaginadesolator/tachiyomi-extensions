@@ -8,6 +8,7 @@ ext {
     extVersionCode = 29
     libVersion = '1.2'
     containsNsfw = true
+    include = true
 }
 
 dependencies {

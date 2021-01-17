@@ -8,6 +8,7 @@ ext {
     extVersionCode = 3
     libVersion = '1.2'
     containsNsfw = true
+    include = true
 }
 
 apply from: "$rootDir/common.gradle"
