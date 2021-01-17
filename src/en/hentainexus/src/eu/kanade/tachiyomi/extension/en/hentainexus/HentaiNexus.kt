@@ -1,6 +1,10 @@
 package eu.kanade.tachiyomi.extension.en.hentainexus
 
+import com.github.salomonbrys.kotson.fromJson
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import eu.kanade.tachiyomi.annotations.Nsfw
+import eu.kanade.tachiyomi.lib.ratelimit.RateLimitInterceptor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.source.model.Filter
@@ -11,6 +15,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import okhttp3.Headers
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -30,21 +35,29 @@ class HentaiNexus : ParsedHttpSource() {
 
     override val supportsLatest = true
 
-    override val client: OkHttpClient = network.cloudflareClient
+    private val rateLimitInterceptor = RateLimitInterceptor(4)
+
+    private val gson = Gson()
+
+    override val client: OkHttpClient = network.client.newBuilder()
+        .addNetworkInterceptor(rateLimitInterceptor)
+        .build()
+
+    override fun headersBuilder() = Headers.Builder().apply {
+        add("User-Agent", USER_AGENT)
+    }
 
     override fun latestUpdatesSelector() = "div.container div.column"
 
     override fun latestUpdatesRequest(page: Int) = pagedRequest("$baseUrl/", page)
 
     override fun latestUpdatesFromElement(element: Element): SManga {
-        val manga = SManga.create()
         val item = element.select("div.column a")
-
-        manga.url = item.attr("href")
-        manga.title = item.text()
-        manga.thumbnail_url = element.select("figure.image > img").attr("src")
-
-        return manga
+        return SManga.create().apply {
+            setUrlWithoutDomain(item.attr("href"))
+            title = item.text()
+            thumbnail_url = element.select("figure.image > img").attr("src")
+        }
     }
 
     override fun latestUpdatesNextPageSelector() = "nav.pagination > a.pagination-next"
@@ -58,43 +71,26 @@ class HentaiNexus : ParsedHttpSource() {
     override fun popularMangaNextPageSelector() = latestUpdatesNextPageSelector()
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        var url: String? = null
-        var queryString: String? = null
-        fun requireNoUrl() = require(url == null && queryString == null) {
-            "You cannot combine filters or use text search with filters!"
-        }
 
-        filters.findInstance<ArtistFilter>()?.let { f ->
-            if (f.state.isNotBlank()) {
-                requireNoUrl()
-                url = "/"
-                queryString = "q=artist:%22${URLEncoder.encode(f.state, "UTF-8")}%22"
+        val exactMatchFilters = filters.filterIsInstance<ExactMatchFilter>().filter { it.state.isNotBlank() }
+
+        val queryParam = when {
+            exactMatchFilters.size > 1 || (exactMatchFilters.size == 1 && query.isNotEmpty()) ->
+                throw Exception("You cannot combine filters or use text search with filters!")
+            query.isNotEmpty() -> URLEncoder.encode(query, "UTF-8")
+            exactMatchFilters.size == 1 -> with(exactMatchFilters.first()) {
+                "${this.uri}:%22${URLEncoder.encode(this.state, "UTF-8")}%22"
             }
+            else -> null
         }
 
-        filters.findInstance<TagFilter>()?.let { f ->
-            if (f.state.isNotBlank()) {
-                requireNoUrl()
-                url = "/"
-                queryString = "q=tag:%22${URLEncoder.encode(f.state, "UTF-8")}%22"
-            }
-        }
-
-        if (query.isNotBlank()) {
-            requireNoUrl()
-            url = "/"
-            queryString = "q=" + URLEncoder.encode(query, "UTF-8")
-        }
-
-        return url?.let {
-            pagedRequest("$baseUrl$url", page, queryString)
-        } ?: latestUpdatesRequest(page)
+        return queryParam?.let { pagedRequest(baseUrl, page, queryParam) } ?: latestUpdatesRequest(page)
     }
 
-    private fun pagedRequest(url: String, page: Int, queryString: String? = null): Request {
+    private fun pagedRequest(url: String, page: Int, query: String? = null): Request {
         // The site redirects page 1 -> url-without-page so we do this redirect early for optimization
-        val builtUrl = if (page == 1) url else "${url}page/$page"
-        return GET(if (queryString != null) "$builtUrl?$queryString" else builtUrl)
+        val urlWithPage = if (page == 1) url else "$url/page/$page"
+        return GET(query?.let { "$urlWithPage/?q=$it" } ?: urlWithPage)
     }
 
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> {
@@ -113,123 +109,87 @@ class HentaiNexus : ParsedHttpSource() {
 
     override fun searchMangaNextPageSelector() = latestUpdatesNextPageSelector()
 
-    override fun mangaDetailsRequest(manga: SManga): Request {
-        if (manga.url.startsWith("http")) {
-            return GET(manga.url, headers)
-        }
-        return super.mangaDetailsRequest(manga)
-    }
-
     override fun mangaDetailsParse(document: Document): SManga {
-        val infoElement = document.select("div.column")
-        val manga = SManga.create()
-        val genres = mutableListOf<String>()
+        val infoElement = document.select("div[class=\"column\"]")
 
-        document.select("td.viewcolumn:containsOwn(Tags) + td a").forEach { element ->
-            val genre = element.text()
-            genres.add(genre)
+        return SManga.create().apply {
+            title = infoElement.select("h1").text()
+            author = infoElement.select("td.viewcolumn:containsOwn(Artist) + td").text()
+            artist = author
+            status = SManga.COMPLETED
+            genre = infoElement.select("td.viewcolumn:containsOwn(Tags) + td a")
+                .joinToString(", ") { it.text() }
+            description = buildDescription(document)
+            thumbnail_url = infoElement.prev().select("figure.image img").attr("src")
         }
-
-        manga.title = infoElement.select("h1").text()
-        manga.author = infoElement.select("td.viewcolumn:containsOwn(Artist) + td").text()
-        manga.artist = infoElement.select("td.viewcolumn:containsOwn(Artist) + td").text()
-        manga.status = SManga.COMPLETED
-        manga.genre = genres.joinToString(", ")
-        manga.description = getDesc(document)
-        manga.thumbnail_url = document.select("figure.image > img").attr("src")
-
-        return manga
     }
 
-    private fun getDesc(document: Document): String {
-        val infoElement = document.select("div.column")
-        val stringBuilder = StringBuilder()
-        val description = infoElement.select("td.viewcolumn:containsOwn(Description) + td").text()
-        val magazine = infoElement.select("td.viewcolumn:containsOwn(Magazine) + td").text()
-        val parodies = infoElement.select("td.viewcolumn:containsOwn(Parody) + td").text()
-        val publisher = infoElement.select("td.viewcolumn:containsOwn(Publisher) + td").text()
-        val pagess = infoElement.select("td.viewcolumn:containsOwn(Pages) + td").text()
+    private fun buildDescription(infoElement: Element): String {
 
-        stringBuilder.append(description)
-        stringBuilder.append("\n\n")
-
-        stringBuilder.append("Magazine: ")
-        stringBuilder.append(magazine)
-        stringBuilder.append("\n\n")
-
-        stringBuilder.append("Parodies: ")
-        stringBuilder.append(parodies)
-        stringBuilder.append("\n\n")
-
-        stringBuilder.append("Publisher: ")
-        stringBuilder.append(publisher)
-        stringBuilder.append("\n\n")
-
-        stringBuilder.append("Pages: ")
-        stringBuilder.append(pagess)
-
-        return stringBuilder.toString()
+        return listOf(
+            "Description",
+            "Magazine",
+            "Language",
+            "Parody",
+            "Publisher"
+        ).map { it to infoElement.select("td.viewcolumn:containsOwn($it) + td").text() }
+            .filter { !it.second.isNullOrEmpty() }
+            .joinToString("\n\n") { "${it.first}:\n${it.second}" }
     }
-
-    override fun chapterListRequest(manga: SManga): Request {
-        if (manga.url.startsWith("http")) {
-            return GET(manga.url, headers)
-        }
-        return super.chapterListRequest(manga)
-    }
-
-    override fun chapterListSelector() = "div.container nav.depict-button-set"
 
     // Chapters
     override fun chapterListParse(response: Response): List<SChapter> {
         return listOf(
             SChapter.create().apply {
-                name = "Read Online: Chapter 0"
-                // page path with a marker at the end
-                url = "${response.request().url().toString().replace("/view/", "/read/")}#"
-                // number of pages
-                url += response.asJsoup().select("td.viewcolumn:containsOwn(Pages) + td").text()
+                name = "Chapter"
+                chapter_number = 1f
+                url = "${response.request().url().toString().replace("/view/", "/read/")}#001"
+                page_count = response.asJsoup().select("td.viewcolumn:containsOwn(Pages) + td").text().toInt()
             }
         )
     }
 
+    override fun chapterListSelector() = throw UnsupportedOperationException("Not used")
+
     override fun chapterFromElement(element: Element): SChapter = throw UnsupportedOperationException("Not used")
 
     // Pages
-    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
-        // split the "url" to get the page path and number of pages
-        return chapter.url.split("#").let { list ->
-            // repeat() turns 1 -> 001 and 10 -> 010
-            Observable.just(listOf(1..list[1].toInt()).flatten().map { Page(it, list[0] + "/${"0".repeat(maxOf(3 - it.toString().length, 0))}$it") })
-        }
-    }
 
-    override fun pageListRequest(chapter: SChapter): Request {
-        if (chapter.url.startsWith("http")) {
-            return GET(chapter.url, headers)
-        }
-        return super.pageListRequest(chapter)
+    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
+        val pageBaseUrl = chapter.url.substringBefore("#")
+        return client.newCall(GET(pageBaseUrl))
+            .asObservableSuccess()
+            .map {
+
+                val encodedReaderData = it.asJsoup().select("script:not([src])").html()
+                    .substringAfter("initReader(\"")
+                    .substringBefore("\", \"") // right before the 2nd argument
+
+                gson.fromJson<JsonObject>(decodeReader(encodedReaderData))["pages"].asJsonArray.mapIndexed { index, p ->
+                    Page(index, "$pageBaseUrl#${it.toString().padStart(3, '0')}", p.asString)
+                }
+            }
     }
 
     override fun pageListParse(document: Document): List<Page> = throw UnsupportedOperationException("Not used")
 
-    override fun imageUrlParse(document: Document): String {
-        return document.select("img#currImage").attr("abs:src")
-    }
+    override fun imageUrlParse(document: Document): String = throw UnsupportedOperationException("Not used")
 
     override fun getFilterList() = FilterList(
-        Filter.Header("Only one filter may be used at a time."),
+        Filter.Header("Only one filter may be used at a time"),
         Filter.Separator(),
-        ArtistFilter(),
-        TagFilter()
+        ExactMatchFilter("Artist", "artist"),
+        ExactMatchFilter("Tag", "tag"),
+        ExactMatchFilter("Parody", "parody"),
+        ExactMatchFilter("Magazine", "magazine"),
+        ExactMatchFilter("Language", "language"),
+        ExactMatchFilter("Publisher", "publisher")
     )
 
-    class ArtistFilter : Filter.Text("Search by Artist (must be exact match)")
-    class TagFilter : Filter.Text("Search by Tag (must be exact match)")
+    class ExactMatchFilter(label: String, val uri: String) : Filter.Text("Search by $label (must be exact match)")
 
     companion object {
         const val PREFIX_ID_SEARCH = "id:"
+        const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36"
     }
 }
-
-private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T

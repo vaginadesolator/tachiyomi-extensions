@@ -5,9 +5,14 @@ ext {
     extName = 'HentaiNexus'
     pkgNameSuffix = 'en.hentainexus'
     extClass = '.HentaiNexus'
-    extVersionCode = 6
+    extVersionCode = 7
     libVersion = '1.2'
     containsNsfw = true
+    include = true
+}
+
+dependencies {
+    implementation project(':lib-ratelimit')
 }
 
 apply from: "$rootDir/common.gradle"
