@@ -49,7 +49,7 @@ class HentaiNexus : ParsedHttpSource() {
 
     override fun latestUpdatesSelector() = "div.container div.column"
 
-    override fun latestUpdatesRequest(page: Int) = pagedRequest("$baseUrl/", page)
+    override fun latestUpdatesRequest(page: Int) = pagedRequest(baseUrl, page)
 
     override fun latestUpdatesFromElement(element: Element): SManga {
         val item = element.select("div.column a")
