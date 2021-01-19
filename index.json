@@ -12,10 +12,10 @@
   {
     "name": "Tachiyomi: HentaiHand",
     "pkg": "eu.kanade.tachiyomi.extension.all.hentaihand",
-    "apk": "vaginadesolator-all.hentaihand-v1.2.2.apk",
+    "apk": "vaginadesolator-all.hentaihand-v1.2.3.apk",
     "lang": "all",
-    "code": 2,
-    "version": "1.2.2",
+    "code": 3,
+    "version": "1.2.3",
     "nsfw": 1,
     "vendor": "vaginadesolator"
   },
@@ -76,6 +76,16 @@
     "lang": "en",
     "code": 7,
     "version": "1.2.7",
+    "nsfw": 1,
+    "vendor": "vaginadesolator"
+  },
+  {
+    "name": "Tachiyomi: Multporn",
+    "pkg": "eu.kanade.tachiyomi.extension.en.multporn",
+    "apk": "vaginadesolator-en.multporn-v1.2.1.apk",
+    "lang": "en",
+    "code": 1,
+    "version": "1.2.1",
     "nsfw": 1,
     "vendor": "vaginadesolator"
   },
