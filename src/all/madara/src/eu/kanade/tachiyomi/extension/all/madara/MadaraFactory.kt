@@ -164,6 +164,7 @@ class MadaraFactory : SourceFactory {
         MiracleScans(),
         MixedManga(),
         MMScans(),
+        MundoWuxia(),
         MysticalMerries(),
         NazarickScans(),
         NeatManga(),
@@ -219,6 +220,7 @@ class MadaraFactory : SourceFactory {
         WebtoonXYZ(),
         WeScans(),
         WoopRead(),
+        WorldRomanceTranslation(),
         WuxiaWorld(),
         YaoiToshokan(),
         YokaiJump(),
@@ -1103,7 +1105,8 @@ class WeScans : Madara("WeScans", "https://wescans.xyz", "en") {
     override fun getFilterList(): FilterList = FilterList()
 }
 
-class ArangScans : Madara("Arang Scans", "https://www.arangscans.com", "en", SimpleDateFormat("d MMM yyyy", Locale.US)) {
+class ArangScans : Madara("Arang Scans", "https://arangscans.com", "en", SimpleDateFormat("d MMM yyyy", Locale.US)) {
+    override val userAgentRandomizer = ""
     // has very few manga
     override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/manga?m_orderby=views", headers)
     override fun popularMangaNextPageSelector(): String? = null
@@ -1521,3 +1524,7 @@ class Siyahmelek : Madara("Siyahmelek", "https://siyahmelek.com", "tr", SimpleDa
 
 @Nsfw
 class SekteDoujin : Madara("Sekte Doujin", "https://sektedoujin.xyz", "id")
+
+class MundoWuxia : Madara("Mundo Wuxia", "https://mundowuxia.com", "es", SimpleDateFormat("MMMM dd, yyyy", Locale("es")))
+
+class WorldRomanceTranslation : Madara("World Romance Translation", "https://wrt.my.id/", "id", SimpleDateFormat("dd MMMM yyyy", Locale("id")))
