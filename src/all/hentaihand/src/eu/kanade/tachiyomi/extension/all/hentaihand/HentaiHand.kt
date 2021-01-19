@@ -1,8 +1,6 @@
 package eu.kanade.tachiyomi.extension.all.hentaihand
 
 import android.annotation.SuppressLint
-import android.annotation.TargetApi
-import android.os.Build
 import com.github.salomonbrys.kotson.fromJson
 import com.github.salomonbrys.kotson.get
 import com.github.salomonbrys.kotson.nullObj
@@ -20,22 +18,18 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
-import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable
-import java.io.IOException
+import rx.schedulers.Schedulers
 import java.text.SimpleDateFormat
-import java.util.concurrent.CompletableFuture
 
 @Nsfw
-class HentaiHand : HttpSource() {
+class HentaiHand(override val lang: String, val hhLangId: Int) : HttpSource() {
 
     override val baseUrl: String = "https://hentaihand.com"
-    override val lang = "en"
     override val name: String = "HentaiHand"
     override val supportsLatest = true
 
@@ -62,7 +56,7 @@ class HentaiHand : HttpSource() {
     override fun popularMangaParse(response: Response): MangasPage = parseGenericResponse(response)
 
     override fun popularMangaRequest(page: Int): Request {
-        return GET("$baseUrl/api/comics?page=$page&sort=popularity&order=desc&duration=all")
+        return GET("$baseUrl/api/comics?page=$page&sort=popularity&order=desc&duration=all&languages=$hhLangId")
     }
 
     // Latest
@@ -70,7 +64,7 @@ class HentaiHand : HttpSource() {
     override fun latestUpdatesParse(response: Response): MangasPage = parseGenericResponse(response)
 
     override fun latestUpdatesRequest(page: Int): Request {
-        return GET("$baseUrl/api/comics?page=$page&sort=uploaded_at&order=desc&duration=week")
+        return GET("$baseUrl/api/comics?page=$page&sort=uploaded_at&order=desc&duration=week&languages=$hhLangId")
     }
 
     // Search
@@ -79,15 +73,14 @@ class HentaiHand : HttpSource() {
 
     private fun lookupFilterId(query: String, uri: String): Int? {
         // filter query needs to be resolved to an ID
-        return GET("$baseUrl/api/$uri?q=$query").let {
-            val future = CallbackFuture()
-            client.newCall(it).enqueue(future)
-            future.get()!!
-        }.let {
-            val data = gson.fromJson<JsonObject>(it.body()!!.string())
-            // only the first tag will be used
-            data.getAsJsonArray("data").firstOrNull()?.let { t -> t["id"].asInt }
-        }
+        return client.newCall(GET("$baseUrl/api/$uri?q=$query"))
+            .asObservableSuccess()
+            .subscribeOn(Schedulers.io())
+            .map {
+                val data = gson.fromJson<JsonObject>(it.body()!!.string())
+                // only the first tag will be used
+                data.getAsJsonArray("data").firstOrNull()?.let { t -> t["id"].asInt }
+            }.toBlocking().first()
     }
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
@@ -95,28 +88,22 @@ class HentaiHand : HttpSource() {
         val url = HttpUrl.parse("$baseUrl/api/comics")!!.newBuilder()
             .addQueryParameter("page", page.toString())
             .addQueryParameter("q", query)
+            .addQueryParameter("languages", hhLangId.toString())
 
         (if (filters.isEmpty()) getFilterList() else filters).forEach { filter ->
             when (filter) {
-                is SortFilter -> {
-                    url.addQueryParameter("sort", getSortPairs()[filter.state].second)
-                }
-                is OrderFilter -> {
-                    url.addQueryParameter("order", getOrderPairs()[filter.state].second)
-                }
-                is DurationFilter -> {
-                    url.addQueryParameter("duration", getDurationPairs()[filter.state].second)
-                }
-                is AttributesGroupFilter -> {
-                    filter.state.forEach {
-                        if (it.state) url.addQueryParameter("attributes", it.value)
-                    }
+                is SortFilter -> url.addQueryParameter("sort", getSortPairs()[filter.state].second)
+                is OrderFilter -> url.addQueryParameter("order", getOrderPairs()[filter.state].second)
+                is DurationFilter -> url.addQueryParameter("duration", getDurationPairs()[filter.state].second)
+                is AttributesGroupFilter -> filter.state.forEach {
+                    if (it.state) url.addQueryParameter("attributes", it.value)
                 }
                 is LookupFilter -> {
                     filter.state.split(",").map { it.trim() }.filter { it.isNotBlank() }.map {
                         lookupFilterId(it, filter.uri) ?: throw Exception("No ${filter.singularName} \"$it\" was found")
                     }.forEach {
-                        url.addQueryParameter(filter.uri, it.toString())
+                        if (!(filter.uri == "languages" && it == hhLangId))
+                            url.addQueryParameter(filter.uri, it.toString())
                     }
                 }
                 else -> {}
@@ -217,7 +204,7 @@ class HentaiHand : HttpSource() {
     private class GroupsFilter : LookupFilter("Groups", "groups", "group")
     private class CharactersFilter : LookupFilter("Characters", "characters", "character")
     private class ParodiesFilter : LookupFilter("Parodies", "parodies", "parody")
-    private class LanguagesFilter : LookupFilter("Languages", "languages", "language")
+    private class LanguagesFilter : LookupFilter("Other Languages", "languages", "language")
     open class LookupFilter(name: String, val uri: String, val singularName: String) : Filter.Text(name)
 
     override fun getFilterList() = FilterList(
@@ -262,21 +249,8 @@ class HentaiHand : HttpSource() {
         Pair("Rewritten", "rewritten")
     )
 
-    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
-
     companion object {
         @SuppressLint("SimpleDateFormat")
         private val DATE_FORMAT = SimpleDateFormat("yyyy-dd-MM")
-    }
-
-    @TargetApi(Build.VERSION_CODES.N)
-    internal class CallbackFuture : CompletableFuture<Response?>(), Callback {
-        override fun onResponse(call: Call?, response: Response?) {
-            super.complete(response)
-        }
-
-        override fun onFailure(call: Call?, e: IOException?) {
-            super.completeExceptionally(e)
-        }
     }
 }
