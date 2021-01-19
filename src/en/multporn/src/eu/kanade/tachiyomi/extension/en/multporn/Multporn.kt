@@ -272,7 +272,7 @@ class Multporn : ParsedHttpSource() {
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not used")
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
-        return client.newCall(GET(manga.url, headers))
+        return client.newCall(GET("$baseUrl${manga.url}", headers))
             .asObservableSuccess()
             .map {
                 listOf(SChapter.create().apply {
