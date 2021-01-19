@@ -4,7 +4,7 @@ apply plugin: 'kotlin-android'
 ext {
     extName = 'HentaiHand'
     pkgNameSuffix = 'all.hentaihand'
-    extClass = '.HentaiHand'
+    extClass = '.HentaiHandFactory'
     extVersionCode = 1
     libVersion = '1.2'
     containsNsfw = true
