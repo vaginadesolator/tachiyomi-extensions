@@ -30,6 +30,16 @@
     "vendor": "vaginadesolator"
   },
   {
+    "name": "Tachiyomi: Luscious",
+    "pkg": "eu.kanade.tachiyomi.extension.all.luscious",
+    "apk": "vaginadesolator-all.luscious-v1.2.1.apk",
+    "lang": "all",
+    "code": 1,
+    "version": "1.2.1",
+    "nsfw": 1,
+    "vendor": "vaginadesolator"
+  },
+  {
     "name": "Tachiyomi: NHentai",
     "pkg": "eu.kanade.tachiyomi.extension.all.nhentai",
     "apk": "vaginadesolator-all.nhentai-v1.2.29.apk",
