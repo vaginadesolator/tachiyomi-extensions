@@ -81,11 +81,11 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
                             )
 
                             if (tagsFilter.anyNotIgnored()) {
-                                addProperty("tagged", tagsFilter.toString())
+                                add(tagsFilter.toJsonObject("tagged"))
                             }
 
                             if (genreFilter.anyNotIgnored()) {
-                                addProperty("genre_ids", genreFilter.toString())
+                                add(genreFilter.toJsonObject("genre_ids"))
                             }
 
                             if (query != "") {
@@ -296,7 +296,7 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
     class TriStateFilterOption(name: String, val value: String) : Filter.TriState(name)
     abstract class TriStateGroupFilter(name: String, options: List<TriStateFilterOption>) : Filter.Group<TriStateFilterOption>(name, options) {
         val included: List<String>
-            get() = state.filter { it.isExcluded() }.map { it.value }
+            get() = state.filter { it.isIncluded() }.map { it.value }
 
         val excluded: List<String>
             get() = state.filter { it.isExcluded() }.map { it.value }
