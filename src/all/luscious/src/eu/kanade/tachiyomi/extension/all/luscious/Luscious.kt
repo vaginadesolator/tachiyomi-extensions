@@ -334,7 +334,7 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
         val selected: String
             get() = options[state].value
 
-        override fun toString(): String = "+$selected"
+        override fun toString(): String = selected
     }
     class SortBySelectFilter(options: List<SelectFilterOption>, default: Int) : SelectFilter("Sort By", options, default)
     class AlbumTypeSelectFilter(options: List<SelectFilterOption>) : SelectFilter("Album Type", options)
@@ -377,8 +377,8 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
     )
 
     fun getAlbumTypeFilters() = listOf(
-        SelectFilterOption("All", FILTER_VALUE_IGNORE),
         SelectFilterOption("Manga", "manga"),
+        SelectFilterOption("All", FILTER_VALUE_IGNORE),
         SelectFilterOption("Pictures", "pictures")
     )
 
@@ -528,9 +528,9 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
         const val PORTUGESE_LUS_LANG_VAL = "100"
         const val THAI_LUS_LANG_VAL = "101"
 
-        private const val POPULAR_DEFAULT_SORT_STATE = 0
+        private const val POPULAR_DEFAULT_SORT_STATE = 18
         private const val LATEST_DEFAULT_SORT_STATE = 7
-        private const val SEARCH_DEFAULT_SORT_STATE = 17
+        private const val SEARCH_DEFAULT_SORT_STATE = 18
 
         private const val FILTER_VALUE_IGNORE = "<ignore>"
 
