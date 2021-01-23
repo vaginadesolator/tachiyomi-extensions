@@ -401,17 +401,17 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
     )
 
     fun getLanguageFilters() = listOf(
-        CheckboxFilterOption("English", ENGLISH_LUS_LANG_VAL),
-        CheckboxFilterOption("Japanese", JAPANESE_LUS_LANG_VAL),
-        CheckboxFilterOption("Spanish", SPANISH_LUS_LANG_VAL),
-        CheckboxFilterOption("Italian", ITALIAN_LUS_LANG_VAL),
-        CheckboxFilterOption("German", GERMAN_LUS_LANG_VAL),
-        CheckboxFilterOption("French", FRENCH_LUS_LANG_VAL),
-        CheckboxFilterOption("Chinese", CHINESE_LUS_LANG_VAL),
-        CheckboxFilterOption("Korean", KOREAN_LUS_LANG_VAL),
-        CheckboxFilterOption("Others", OTHERS_LUS_LANG_VAL),
-        CheckboxFilterOption("Portugese", PORTUGESE_LUS_LANG_VAL),
-        CheckboxFilterOption("Thai", THAI_LUS_LANG_VAL)
+        CheckboxFilterOption("English", ENGLISH_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Japanese", JAPANESE_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Spanish", SPANISH_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Italian", ITALIAN_LUS_LANG_VAL, false),
+        CheckboxFilterOption("German", GERMAN_LUS_LANG_VAL, false),
+        CheckboxFilterOption("French", FRENCH_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Chinese", CHINESE_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Korean", KOREAN_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Others", OTHERS_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Portugese", PORTUGESE_LUS_LANG_VAL, false),
+        CheckboxFilterOption("Thai", THAI_LUS_LANG_VAL, false)
     ).filterNot { it.value == lusLang }
 
     fun getTagFilters() = listOf(
