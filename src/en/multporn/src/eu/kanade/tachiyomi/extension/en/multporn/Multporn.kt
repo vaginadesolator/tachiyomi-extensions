@@ -17,13 +17,14 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
-import okhttp3.FormBody
+import okhttp3.OkHttpClient
 import okhttp3.Headers
-import okhttp3.HttpUrl
-import okhttp3.MediaType
 import okhttp3.Request
+import okhttp3.FormBody
 import okhttp3.Response
+import okhttp3.MediaType
 import okhttp3.ResponseBody
+import okhttp3.HttpUrl
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
@@ -37,6 +38,8 @@ class Multporn : ParsedHttpSource() {
     override val lang: String = "en"
     override val baseUrl = "https://multporn.net"
     override val supportsLatest = true
+
+    override val client: OkHttpClient = network.cloudflareClient
 
     private val gson = Gson()
 
@@ -268,15 +271,18 @@ class Multporn : ParsedHttpSource() {
 
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not used")
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = Observable.just(
-        listOf(
-            SChapter.create().apply {
-                url = manga.url
-                name = "Chapter"
-                chapter_number = 1f
+    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
+        return client.newCall(GET("$baseUrl${manga.url}", headers))
+            .asObservableSuccess()
+            .map {
+                listOf(SChapter.create().apply {
+                    url = manga.url
+                    name = "Chapter"
+                    chapter_number = 1f
+                    page_count = it.asJsoup().select(".jb-image img").size
+                })
             }
-        )
-    )
+    }
 
     // Pages
 

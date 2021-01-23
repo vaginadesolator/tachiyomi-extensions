@@ -132,7 +132,6 @@ class IMHentai(override val lang: String, private val imhLang: String) : ParsedH
 
         status = SManga.COMPLETED
 
-        val pages = mangaInfoElement.select("li.pages").text().substringAfter("Pages: ")
         val altTitle = document.select(".subtitle").text().ifBlank { null }
 
         description = listOf(
@@ -142,7 +141,7 @@ class IMHentai(override val lang: String, private val imhLang: String) : ParsedH
             "Languages",
             "Category"
         ).map { it to infoMap[it]?.csvText() }
-            .let { listOf(Pair("Alternate Title", altTitle)) + it + listOf(Pair("Pages", pages)) }
+            .let { listOf(Pair("Alternate Title", altTitle)) + it }
             .filter { !it.second.isNullOrEmpty() }
             .joinToString("\n\n") { "${it.first}:\n${it.second}" }
     }
@@ -171,6 +170,8 @@ class IMHentai(override val lang: String, private val imhLang: String) : ParsedH
                 setUrlWithoutDomain(response.request().url().toString())
                 name = "Chapter"
                 chapter_number = 1f
+                page_count = response.asJsoup().select("li.pages").text()
+                    .substringAfter("Pages: ").toInt()
             }
         )
     }

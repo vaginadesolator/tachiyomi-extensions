@@ -1,4 +1,4 @@
-![CI](https://github.com/tachiyomiorg/tachiyomi-extensions/workflows/CI/badge.svg?event=push)
+![CI](https://github.com/vaginadesolator/tachiyomi-extensions/workflows/CI/badge.svg?event=push)
 
 This repository contains the available extension catalogues for the [Tachiyomi](https://github.com/tachiyomiorg/tachiyomi) app.
 

@@ -240,7 +240,6 @@ open class NHentai(
             description = "Full English and Japanese titles:\n"
                 .plus("$fullTitle\n")
                 .plus("${document.select("div#info h2").text()}\n\n")
-                .plus("Pages: ${getNumPages(document)}\n")
                 .plus("Favorited by: ${document.select("div#info i.fa-heart + span span").text().removeSurrounding("(", ")")}\n")
                 .plus(getTagDescription(document))
             genre = getTags(document)
@@ -257,6 +256,7 @@ open class NHentai(
                 scanlator = getGroups(document)
                 date_upload = getTime(document)
                 setUrlWithoutDomain(response.request().url().encodedPath())
+                page_count = getNumPages(document).toInt()
             }
         )
     }
@@ -267,7 +267,7 @@ open class NHentai(
 
     override fun pageListParse(document: Document): List<Page> {
         return document.select("div.thumbs a > img").mapIndexed { i, img ->
-            Page(i, "", img.attr("abs:data-src").replace("t.nh", "i.nh").replace("t.", "."))
+            Page(i, "${document.location()}${i + 1}/", img.attr("abs:data-src").replace("t.nh", "i.nh").replace("t.", "."))
         }
     }
 

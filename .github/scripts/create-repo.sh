@@ -21,11 +21,12 @@ for APK in ${APKS[@]}; do
     VCODE=$(echo $PACKAGE | grep -Po "versionCode='\K[^']+")
     VNAME=$(echo $PACKAGE | grep -Po "versionName='\K[^']+")
     NSFW=$(echo $BADGING | grep -Po "tachiyomi.extension.nsfw' value='\K[^']+")
+    VENDOR=$(echo $BADGING | grep -Po "tachiyomi.extension.vendor' value='\K[^']+")
 
     APPLICATION=$(echo "$BADGING" | grep application:)
     LABEL=$(echo $APPLICATION | grep -Po "label='\K[^']+")
 
-    LANG=$(echo $APK | grep -Po "tachiyomi-\K[^\.]+")
+    LANG=$(echo $APK | grep -Po "$VENDOR-\K[^\.]+")
 
     ICON=$(echo "$BADGING" | grep -Po "application-icon-320.*'\K[^']+")
     unzip -p $APK $ICON > icon/${FILENAME%.*}.png
@@ -38,7 +39,8 @@ for APK in ${APKS[@]}; do
         --argjson code $VCODE \
         --arg version "$VNAME" \
         --argjson nsfw $NSFW \
-        '{name:$name, pkg:$pkg, apk:$apk, lang:$lang, code:$code, version:$version, nsfw:$nsfw}'
+        --arg vendor "$VENDOR" \
+        '{name:$name, pkg:$pkg, apk:$apk, lang:$lang, code:$code, version:$version, nsfw:$nsfw, vendor:$vendor}'
 
 done | jq -sr '[.[]]' > index.json
 
