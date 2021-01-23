@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.all.luscious
 
-import android.util.Log
 import com.github.salomonbrys.kotson.addProperty
 import com.github.salomonbrys.kotson.fromJson
 import com.github.salomonbrys.kotson.get
@@ -22,6 +21,7 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.jsoup.nodes.Document
 import rx.Observable
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -62,10 +62,10 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
                         JsonArray().apply {
 
                             if (contentTypeFilter.selected != FILTER_VALUE_IGNORE)
-                                add(contentTypeFilter.toJsonObject("album_type"))
+                                add(contentTypeFilter.toJsonObject("content_id"))
 
                             if (albumTypeFilter.selected != FILTER_VALUE_IGNORE)
-                                add(albumTypeFilter.toJsonObject("content_id"))
+                                add(albumTypeFilter.toJsonObject("album_type"))
 
                             with(interestsFilter) {
                                 if (this.selected.isEmpty()) {
@@ -175,63 +175,84 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
         }
     }
 
-    private fun buildAlbumPicturesRequest(id: String, page: Int): Request {
+    private fun buildAlbumPicturesPageUrl(id: String, page: Int): String {
         val input = buildAlbumPicturesRequestInput(id, page)
-        val url = HttpUrl.parse(apiBaseUrl)!!.newBuilder()
+        return HttpUrl.parse(apiBaseUrl)!!.newBuilder()
             .addQueryParameter("operationName", "AlbumListOwnPictures")
             .addQueryParameter("query", ALBUM_PICTURES_REQUEST_GQL)
             .addQueryParameter("variables", input.toString())
             .toString()
-        return GET(url, headers)
     }
 
-    private class PicturesPage(val pages: List<Page>, val hasNextPage: Boolean)
+    private fun parseAlbumPicturesResponse(response: Response): List<Page> {
 
-    private fun parseAlbumPicturesResponse(response: Response, pageIndexOffset: Int): PicturesPage {
-        val data = gson.fromJson<JsonObject>(response.body()!!.string()).let {
-            it["data"]["picture"]["list"].asJsonObject
-        }
-        return PicturesPage(
-            data["items"].asJsonArray.mapIndexed { index, it ->
-                Page(pageIndexOffset + index, imageUrl = it["url_to_original"].asString)
-            },
-            data["info"]["has_next_page"].asBoolean
-        )
-    }
+        val id = response.request().url().queryParameter("variables").toString()
+            .let { gson.fromJson<JsonObject>(it)["input"]["filters"].asJsonArray }
+            .let { it.first { f -> f["name"].asString == "album_id" } }
+            .let { it["value"].asString }
 
-    private fun fetchAlbumPicturesPage(id: String, page: Int, pageIndexOffset: Int): Observable<PicturesPage> {
-        val request = buildAlbumPicturesRequest(id, page)
-        return client.newCall(request)
-            .asObservableSuccess()
-            .map { parseAlbumPicturesResponse(it, pageIndexOffset) }
-    }
+        val data = gson.fromJson<JsonObject>(response.body()!!.string())
+            .let { it["data"]["picture"]["list"].asJsonObject }
 
-    private fun fetchAlbumPictures(id: String, page: Int = 1, pages: MutableList<Page> = mutableListOf()): Observable<List<Page>> {
-        return fetchAlbumPicturesPage(id, page, pages.size).flatMap {
-            pages.addAll(it.pages)
-            if (it.hasNextPage) {
-                fetchAlbumPictures(id, page + 1, pages)
-            } else Observable.just(pages)
-        }
+        return data["items"].asJsonArray.mapIndexed { index, it ->
+            Page(index, imageUrl = it["url_to_original"].asString)
+        } + if (data["info"]["total_pages"].asInt > 1) { // get 2nd page onwards
+            (ITEMS_PER_PAGE until data["info"]["total_items"].asInt).chunked(ITEMS_PER_PAGE).mapIndexed { page, indices ->
+                indices.map { Page(it, url = buildAlbumPicturesPageUrl(id, page + 2)) }
+            }.flatten()
+        } else emptyList()
     }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
         val id = chapter.url.substringAfterLast("_").removeSuffix("/")
-
-        return fetchAlbumPictures(id)
+        return client.newCall(GET(buildAlbumPicturesPageUrl(id, 1)))
+            .asObservableSuccess()
+            .map { parseAlbumPicturesResponse(it) }
     }
 
     override fun pageListParse(response: Response): List<Page> = throw UnsupportedOperationException("Not used")
 
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException("Not used")
 
+    override fun fetchImageUrl(page: Page): Observable<String> {
+        if (page.imageUrl != null) {
+            return Observable.just(page.imageUrl)
+        }
+
+        return client.newCall(GET(page.url, headers))
+            .asObservableSuccess()
+            .map {
+                val data = gson.fromJson<JsonObject>(it.body()!!.string()).let { data ->
+                    data["data"]["picture"]["list"].asJsonObject
+                }
+                data["items"].asJsonArray[page.index % 50].asJsonObject["url_to_original"].asString
+            }
+    }
+
     // Details
 
-    private fun getAlbumFromResponse(response: Response): JsonObject {
-        val id = gson.fromJson<JsonObject>(response.request().url().queryParameter("variables").toString())["id"].asString
-        return gson.fromJson<JsonObject>(response.body()!!.string())["data"]["album"]["list_related"]["more_like_this"].asJsonArray.first {
-            it["id"].asString == id
-        }.asJsonObject
+    private fun parseMangaGenre(document: Document): String {
+        return listOf(
+            document.select(".o-tag--secondary").map { it.text().substringBefore("(").trim() },
+            document.select(".o-tag:not([href *= /tags/artist])").map { it.text() },
+            document.select(".album-info-item:contains(Content:) .o-tag").map { it.text() }
+        ).flatten().joinToString()
+    }
+
+    private fun parseMangaDescription(document: Document): String {
+        val pageCount: String? = (
+            document.select(".album-info-item:contains(pictures)").firstOrNull()
+                ?: document.select(".album-info-item:contains(gifs)").firstOrNull()
+            )?.text()
+
+        return listOf(
+            Pair("Description", document.select(".album-description:last-of-type")?.text()),
+            Pair("Pages", pageCount)
+        ).let {
+            it + listOf("Parody", "Character", "Ethnicity")
+                .map { key -> key to document.select(".o-tag--category:contains($key) .o-tag").joinToString { t -> t.text() } }
+        }.filter { desc -> !desc.second.isNullOrBlank() }
+            .joinToString("\n\n") { "${it.first}:\n${it.second}" }
     }
 
     override fun mangaDetailsParse(response: Response): SManga {
@@ -241,11 +262,7 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
             artist = document.select(".o-tag--category:contains(Artist:) .o-tag")?.joinToString() { it.text() }
             author = artist
 
-            genre = listOf(
-                document.select(".o-tag--secondary").map { it.text().substringBefore("(").trim() },
-                document.select(".o-tag:not([href *= /tags/artist])").map { it.text() },
-                document.select(".album-info-item:contains(Content:) .o-tag").map { it.text() }
-            ).flatten().joinToString()
+            genre = parseMangaGenre(document)
 
             title = document.select("a[title]").text()
             status = when {
@@ -253,19 +270,7 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
                 else -> SManga.COMPLETED
             }
 
-            val pageCount: String? = (
-                document.select(".album-info-item:contains(pictures)").firstOrNull()
-                    ?: document.select(".album-info-item:contains(gifs)").firstOrNull()
-                )?.text()
-
-            description = listOf(
-                Pair("Description", document.select(".album-description:last-of-type")?.text()),
-                Pair("Pages", pageCount)
-            ).let {
-                it + listOf("Parody", "Character", "Ethnicity")
-                    .map { key -> key to document.select(".o-tag--category:contains($key) .o-tag").joinToString { t -> t.text() } }
-            }.filter { desc -> !desc.second.isNullOrBlank() }
-                .joinToString("\n\n") { "${it.first}:\n${it.second}" }
+            description = parseMangaDescription(document)
         }
     }
 
@@ -279,7 +284,14 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
 
     override fun searchMangaParse(response: Response): MangasPage = parseAlbumListResponse(response)
 
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = buildAlbumListRequest(page, getSortFilters(SEARCH_DEFAULT_SORT_STATE), query)
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = buildAlbumListRequest(
+        page,
+        filters.let {
+            if (it.isEmpty()) getSortFilters(SEARCH_DEFAULT_SORT_STATE)
+            else it
+        },
+        query
+    )
 
     class TriStateFilterOption(name: String, val value: String) : Filter.TriState(name)
     abstract class TriStateGroupFilter(name: String, options: List<TriStateFilterOption>) : Filter.Group<TriStateFilterOption>(name, options) {
@@ -324,19 +336,19 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
 
         override fun toString(): String = "+$selected"
     }
-    class SortBySelectFilter(filters: List<SelectFilterOption>, default: Int) : SelectFilter("Sort By", filters, default)
-    class AlbumTypeSelectFilter(filters: List<SelectFilterOption>) : SelectFilter("Album Type", filters)
-    class ContentTypeSelectFilter(filters: List<SelectFilterOption>) : SelectFilter("Content Type", filters)
+    class SortBySelectFilter(options: List<SelectFilterOption>, default: Int) : SelectFilter("Sort By", options, default)
+    class AlbumTypeSelectFilter(options: List<SelectFilterOption>) : SelectFilter("Album Type", options)
+    class ContentTypeSelectFilter(options: List<SelectFilterOption>) : SelectFilter("Content Type", options)
 
     override fun getFilterList(): FilterList = getSortFilters(POPULAR_DEFAULT_SORT_STATE)
 
     private fun getSortFilters(sortState: Int) = FilterList(
         SortBySelectFilter(getSortFilters(), sortState),
+        AlbumTypeSelectFilter(getAlbumTypeFilters()),
+        ContentTypeSelectFilter(getContentTypeFilters()),
         InterestGroupFilter(getInterestFilters()),
         LanguageGroupFilter(getLanguageFilters()),
-        AlbumTypeSelectFilter(getAlbumTypeFilters()),
         TagGroupFilter(getTagFilters()),
-        ContentTypeSelectFilter(getContentTypeFilters()),
         GenreGroupFilter(getGenreFilters())
     )
 
@@ -497,6 +509,8 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
 
     companion object {
 
+        private const val ITEMS_PER_PAGE = 50
+
         private val ORDINAL_SUFFIXES = listOf("st", "nd", "rd", "th")
         private val DATE_FORMATS_WITH_ORDINAL_SUFFIXES = ORDINAL_SUFFIXES.map {
             SimpleDateFormat("MMMM dd'$it', yyyy", Locale.US)
@@ -518,10 +532,7 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
         private const val LATEST_DEFAULT_SORT_STATE = 7
         private const val SEARCH_DEFAULT_SORT_STATE = 17
 
-        private const val FILTER_VALUE_IGNORE = ""
-
-        const val HEADER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36"
-        const val HEADER_CONTENT_TYPE = "application/x-www-form-urlencoded; charset=UTF-8"
+        private const val FILTER_VALUE_IGNORE = "<ignore>"
 
         private val ALBUM_LIST_REQUEST_GQL = """
             query AlbumList(${'$'}input: AlbumListInput!) {
@@ -542,6 +553,8 @@ class Luscious(override val lang: String, private val lusLang: String) : HttpSou
                 picture {
                     list(input: ${'$'}input) {
                         info {
+                            total_items
+                            total_pages
                             page
                             has_next_page
                         }
