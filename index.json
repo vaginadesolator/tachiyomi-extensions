@@ -32,10 +32,10 @@
   {
     "name": "Tachiyomi: Luscious",
     "pkg": "eu.kanade.tachiyomi.extension.all.luscious",
-    "apk": "vaginadesolator-all.luscious-v1.2.1.apk",
+    "apk": "vaginadesolator-all.luscious-v1.2.2.apk",
     "lang": "all",
-    "code": 1,
-    "version": "1.2.1",
+    "code": 2,
+    "version": "1.2.2",
     "nsfw": 1,
     "vendor": "vaginadesolator"
   },
