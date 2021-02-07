@@ -137,7 +137,8 @@ class Remanga : ConfigurableSource, HttpSource() {
 
     private fun LibraryDto.toSManga(): SManga =
         SManga.create().apply {
-            title = en_name + "\n" + rus_name
+            // Do not change the title name to ensure work with a multilingual catalog!
+            title = en_name
             url = "/api/titles/$dir/"
             thumbnail_url = "$baseUrl/${img.high}"
         }
@@ -213,10 +214,11 @@ class Remanga : ConfigurableSource, HttpSource() {
     private fun MangaDetDto.toSManga(): SManga {
         val o = this
         return SManga.create().apply {
-            title = en_name + "\n" + rus_name
+            // Do not change the title name to ensure work with a multilingual catalog!
+            title = en_name
             url = "/api/titles/$dir/"
             thumbnail_url = "$baseUrl/${img.high}"
-            this.description = Jsoup.parse(o.description).text()
+            this.description = "Русское название: " + rus_name + "\n" + Jsoup.parse(o.description).text()
             genre = (genres + parseType(type)).joinToString { it.name }
             status = parseStatus(o.status.id)
         }
@@ -305,7 +307,7 @@ class Remanga : ConfigurableSource, HttpSource() {
         val chapters = gson.fromJson<PageWrapperDto<BookDto>>(response.body()?.charStream()!!)
         return chapters.content.filter { !it.is_paid or it.is_bought }.map { chapter ->
             SChapter.create().apply {
-                chapter_number = 1F
+                chapter_number = chapter.chapter.split(".").take(2).joinToString(".").toFloat()
                 name = chapterName(chapter)
                 url = "/api/titles/chapters/${chapter.id}"
                 date_upload = parseDate(chapter.upload_date)
